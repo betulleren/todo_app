@@ -52,26 +52,18 @@ class _TodoListScreenState extends State<TodoListScreen> {
     if (title.trim().isEmpty) return;
     final newTodo = Todo(id: DateTime.now().toString(), title: title.trim());
     _todos.insert(0, newTodo);
-    if (_todos.length == 1) {
-      // Eğer liste boştuysa ve ilk eleman eklendiyse,
-      // AnimatedList render edilmemiş olabileceği için normal setState yapıyoruz
-      setState(() {});
-    } else {
-      _listKey.currentState?.insertItem(0, duration: const Duration(milliseconds: 500));
-    }
+    _listKey.currentState?.insertItem(0, duration: const Duration(milliseconds: 500));
+    setState(() {});
   }
 
   void _removeTodo(int index) {
     final removedTodo = _todos.removeAt(index);
-    if (_todos.isEmpty) {
-      setState(() {});
-    } else {
-      _listKey.currentState?.removeItem(
-        index,
-        (context, animation) => _buildItem(removedTodo, animation, index, true),
-        duration: const Duration(milliseconds: 400),
-      );
-    }
+    _listKey.currentState?.removeItem(
+      index,
+      (context, animation) => _buildItem(removedTodo, animation, index, true),
+      duration: const Duration(milliseconds: 400),
+    );
+    setState(() {});
 
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -88,10 +80,20 @@ class _TodoListScreenState extends State<TodoListScreen> {
   }
 
   Widget _buildItem(Todo todo, Animation<double> animation, int index, bool isRemoving) {
-    return SizeTransition(
-      sizeFactor: animation,
-      child: FadeTransition(
-        opacity: animation,
+    final curvedAnimation = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutBack,
+    );
+
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(1.0, 0.0),
+        end: Offset.zero,
+      ).animate(curvedAnimation),
+      child: SizeTransition(
+        sizeFactor: curvedAnimation,
+        child: FadeTransition(
+          opacity: animation,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           margin: const EdgeInsets.only(bottom: 20),
@@ -153,8 +155,9 @@ class _TodoListScreenState extends State<TodoListScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   void _showAddDialog() {
     showDialog(
@@ -310,8 +313,12 @@ class _TodoListScreenState extends State<TodoListScreen> {
                 ),
               ),
             Expanded(
-              child: _todos.isEmpty
-                  ? Center(
+              child: Stack(
+                children: [
+                  AnimatedOpacity(
+                    opacity: _todos.isEmpty ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 400),
+                    child: Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -351,9 +358,12 @@ class _TodoListScreenState extends State<TodoListScreen> {
                           ),
                         ],
                       ),
-                    )
+                    ),
+                  ),
                   // 3. Özellik: AnimatedList
-                  : AnimatedList(
+                  IgnorePointer(
+                    ignoring: _todos.isEmpty,
+                    child: AnimatedList(
                       key: _listKey,
                       padding: const EdgeInsets.only(
                           left: 20, right: 20, top: 30, bottom: 120),
@@ -362,6 +372,9 @@ class _TodoListScreenState extends State<TodoListScreen> {
                         return _buildItem(_todos[index], animation, index, false);
                       },
                     ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
