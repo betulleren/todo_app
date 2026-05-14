@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/todo_model.dart';
 
+// StatefulWidget ve setState() kullanımı
 class TodoListScreen extends StatefulWidget {
   final bool isDarkMode;
   final Function(bool) onThemeChanged;
@@ -22,6 +23,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
   final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
 
   // Method Channel Tanımlaması
+  // Native iletişim için MethodChannel (Batarya)
   static const platform = MethodChannel('samples.flutter.dev/battery');
   String _batteryLevel = 'Batarya: ?';
 
@@ -48,11 +50,13 @@ class _TodoListScreenState extends State<TodoListScreen> {
     });
   }
 
+  // Görev Ekleme/Silme, SnackBar ve AnimatedList
   void _addTodo(String title) {
     if (title.trim().isEmpty) return;
     final newTodo = Todo(id: DateTime.now().toString(), title: title.trim());
     _todos.insert(0, newTodo);
-    _listKey.currentState?.insertItem(0, duration: const Duration(milliseconds: 500));
+    _listKey.currentState
+        ?.insertItem(0, duration: const Duration(milliseconds: 500));
     setState(() {});
   }
 
@@ -79,7 +83,8 @@ class _TodoListScreenState extends State<TodoListScreen> {
     );
   }
 
-  Widget _buildItem(Todo todo, Animation<double> animation, int index, bool isRemoving) {
+  Widget _buildItem(
+      Todo todo, Animation<double> animation, int index, bool isRemoving) {
     final curvedAnimation = CurvedAnimation(
       parent: animation,
       curve: Curves.easeOutBack,
@@ -94,70 +99,78 @@ class _TodoListScreenState extends State<TodoListScreen> {
         sizeFactor: curvedAnimation,
         child: FadeTransition(
           opacity: animation,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          margin: const EdgeInsets.only(bottom: 20),
-          decoration: BoxDecoration(
-            color: widget.isDarkMode ? Colors.grey[800] : Colors.white,
-            borderRadius: BorderRadius.circular(25),
-            border: Border.all(
-              color: widget.isDarkMode ? Colors.grey.shade700 : Colors.pink.shade50,
-              width: 1.5,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            margin: const EdgeInsets.only(bottom: 20),
+            decoration: BoxDecoration(
+              color: widget.isDarkMode ? Colors.grey[800] : Colors.white,
+              borderRadius: BorderRadius.circular(25),
+              border: Border.all(
+                color: widget.isDarkMode
+                    ? Colors.grey.shade700
+                    : Colors.pink.shade50,
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: todo.isDone
+                      ? Colors.grey.withOpacity(0.05)
+                      : (widget.isDarkMode
+                          ? Colors.black26
+                          : Colors.pink.withOpacity(0.08)),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: todo.isDone
-                    ? Colors.grey.withOpacity(0.05)
-                    : (widget.isDarkMode ? Colors.black26 : Colors.pink.withOpacity(0.08)),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
+            child: ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              leading: Transform.scale(
+                scale: 1.8,
+                child: Checkbox(
+                  value: todo.isDone,
+                  onChanged: isRemoving
+                      ? null
+                      : (val) => setState(() => todo.isDone = val!),
+                  activeColor: Colors.pink,
+                  shape: const CircleBorder(),
+                  side: BorderSide(color: Colors.pink.shade200, width: 2),
+                ),
               ),
-            ],
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            leading: Transform.scale(
-              scale: 1.8,
-              child: Checkbox(
-                value: todo.isDone,
-                onChanged: isRemoving
-                    ? null
-                    : (val) => setState(() => todo.isDone = val!),
-                activeColor: Colors.pink,
-                shape: const CircleBorder(),
-                side: BorderSide(color: Colors.pink.shade200, width: 2),
+              title: Text(
+                todo.title,
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w600,
+                  color: todo.isDone
+                      ? Colors.grey.shade500
+                      : (widget.isDarkMode ? Colors.white : Colors.black87),
+                  decoration: todo.isDone ? TextDecoration.lineThrough : null,
+                  decorationColor: Colors.pink.shade300,
+                  decorationThickness: 2,
+                ),
               ),
-            ),
-            title: Text(
-              todo.title,
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.w600,
-                color: todo.isDone
-                    ? Colors.grey.shade500
-                    : (widget.isDarkMode ? Colors.white : Colors.black87),
-                decoration: todo.isDone ? TextDecoration.lineThrough : null,
-                decorationColor: Colors.pink.shade300,
-                decorationThickness: 2,
-              ),
-            ),
-            trailing: Container(
-              decoration: BoxDecoration(
-                color: widget.isDarkMode ? Colors.red.shade900.withOpacity(0.3) : Colors.red.shade50,
-                shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                icon: Icon(Icons.delete_outline,
-                    color: widget.isDarkMode ? Colors.redAccent : Colors.red, size: 32),
-                onPressed: isRemoving ? null : () => _removeTodo(index),
+              trailing: Container(
+                decoration: BoxDecoration(
+                  color: widget.isDarkMode
+                      ? Colors.red.shade900.withOpacity(0.3)
+                      : Colors.red.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: Icon(Icons.delete_outline,
+                      color: widget.isDarkMode ? Colors.redAccent : Colors.red,
+                      size: 32),
+                  onPressed: isRemoving ? null : () => _removeTodo(index),
+                ),
               ),
             ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   void _showAddDialog() {
     showDialog(
@@ -169,22 +182,28 @@ class _TodoListScreenState extends State<TodoListScreen> {
           'Yeni Görev Ekle',
           textAlign: TextAlign.center,
           style: TextStyle(
-              fontSize: 28, fontWeight: FontWeight.bold, color: Colors.pink.shade300),
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Colors.pink.shade300),
         ),
         content: TextField(
           controller: _textController,
           autofocus: true,
-          style: TextStyle(fontSize: 24, color: widget.isDarkMode ? Colors.white : Colors.black87),
+          style: TextStyle(
+              fontSize: 24,
+              color: widget.isDarkMode ? Colors.white : Colors.black87),
           decoration: InputDecoration(
             hintText: 'Ne yapacaksın?',
             hintStyle: TextStyle(fontSize: 22, color: Colors.grey.shade500),
             filled: true,
-            fillColor: widget.isDarkMode ? Colors.grey[800] : Colors.pink.shade50,
+            fillColor:
+                widget.isDarkMode ? Colors.grey[800] : Colors.pink.shade50,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(20),
               borderSide: BorderSide.none,
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           ),
         ),
         actionsAlignment: MainAxisAlignment.center,
@@ -202,16 +221,19 @@ class _TodoListScreenState extends State<TodoListScreen> {
               foregroundColor: Colors.white,
               elevation: 5,
               shadowColor: Colors.pink.withOpacity(0.5),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
               minimumSize: const Size(160, 60),
             ),
-            child: const Text('EKLE', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            child: const Text('EKLE',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
+  // Arayüz oluşturma ve "Her şey widget'tır" mantığı
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -235,16 +257,21 @@ class _TodoListScreenState extends State<TodoListScreen> {
                   child: FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text('Yapılacaklar',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 28, letterSpacing: 1.0)),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 28,
+                            letterSpacing: 1.0)),
                   ),
                 ),
               ),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(widget.isDarkMode ? Icons.dark_mode : Icons.light_mode, size: 24),
+                  Icon(widget.isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                      size: 24),
                   const SizedBox(width: 5),
                   // 1. Özellik: Adaptive Switch
+                  // Tema değişimi için Switch.adaptive
                   Switch.adaptive(
                     value: widget.isDarkMode,
                     onChanged: widget.onThemeChanged,
@@ -259,7 +286,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: widget.isDarkMode 
+              colors: widget.isDarkMode
                   ? [Colors.pink.shade900, Colors.pink.shade800]
                   : [Colors.pink.shade400, Colors.pink.shade300],
               begin: Alignment.topLeft,
@@ -282,7 +309,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: widget.isDarkMode 
+            colors: widget.isDarkMode
                 ? [const Color(0xFF121212), const Color(0xFF1E1E1E)]
                 : [const Color(0xFFFFF0F5), Colors.white],
             begin: Alignment.topCenter,
@@ -296,7 +323,8 @@ class _TodoListScreenState extends State<TodoListScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 15),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.green.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
@@ -305,10 +333,9 @@ class _TodoListScreenState extends State<TodoListScreen> {
                   child: Text(
                     _batteryLevel,
                     style: const TextStyle(
-                      fontSize: 18, 
-                      fontWeight: FontWeight.bold, 
-                      color: Colors.green
-                    ),
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green),
                   ),
                 ),
               ),
@@ -325,7 +352,9 @@ class _TodoListScreenState extends State<TodoListScreen> {
                           Container(
                             padding: const EdgeInsets.all(40),
                             decoration: BoxDecoration(
-                              color: widget.isDarkMode ? Colors.grey[800] : Colors.pink.shade50,
+                              color: widget.isDarkMode
+                                  ? Colors.grey[800]
+                                  : Colors.pink.shade50,
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
@@ -353,7 +382,9 @@ class _TodoListScreenState extends State<TodoListScreen> {
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 fontSize: 16,
-                                color: widget.isDarkMode ? Colors.grey.shade400 : Colors.grey,
+                                color: widget.isDarkMode
+                                    ? Colors.grey.shade400
+                                    : Colors.grey,
                                 fontStyle: FontStyle.italic),
                           ),
                         ],
@@ -369,7 +400,8 @@ class _TodoListScreenState extends State<TodoListScreen> {
                           left: 20, right: 20, top: 30, bottom: 120),
                       initialItemCount: _todos.length,
                       itemBuilder: (context, index, animation) {
-                        return _buildItem(_todos[index], animation, index, false);
+                        return _buildItem(
+                            _todos[index], animation, index, false);
                       },
                     ),
                   ),
@@ -394,6 +426,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
           width: 90,
           height: 90,
           child: FloatingActionButton(
+            // Hot Reload demosu (Rengi değiştir)
             onPressed: _showAddDialog,
             backgroundColor: Colors.pink,
             elevation: 0,
