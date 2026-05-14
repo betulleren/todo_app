@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/todo_model.dart';
 
 class TodoListScreen extends StatefulWidget {
-  const TodoListScreen({super.key});
+  final bool isDarkMode;
+  final Function(bool) onThemeChanged;
+
+  const TodoListScreen({
+    super.key,
+    required this.isDarkMode,
+    required this.onThemeChanged,
+  });
 
   @override
   State<TodoListScreen> createState() => _TodoListScreenState();
@@ -11,42 +19,190 @@ class TodoListScreen extends StatefulWidget {
 class _TodoListScreenState extends State<TodoListScreen> {
   final List<Todo> _todos = [];
   final TextEditingController _textController = TextEditingController();
+  final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
 
-  // YENİ GÖREV EKLEME PENCERESİ
+  // Method Channel Tanımlaması
+  static const platform = MethodChannel('samples.flutter.dev/battery');
+  String _batteryLevel = 'Batarya: ?';
+
+  Future<void> _getBatteryLevel() async {
+    String batteryLevel;
+    try {
+      final int result = await platform.invokeMethod('getBatteryLevel');
+      batteryLevel = 'Batarya: %$result';
+    } on PlatformException catch (e) {
+      batteryLevel = "Alınamadı: '${e.message}'.";
+    }
+
+    setState(() {
+      _batteryLevel = batteryLevel;
+    });
+
+    // Batarya yazısını 3 saniye sonra gizle
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _batteryLevel = 'Batarya: ?';
+        });
+      }
+    });
+  }
+
+  void _addTodo(String title) {
+    if (title.trim().isEmpty) return;
+    final newTodo = Todo(id: DateTime.now().toString(), title: title.trim());
+    _todos.insert(0, newTodo);
+    if (_todos.length == 1) {
+      // Eğer liste boştuysa ve ilk eleman eklendiyse,
+      // AnimatedList render edilmemiş olabileceği için normal setState yapıyoruz
+      setState(() {});
+    } else {
+      _listKey.currentState?.insertItem(0, duration: const Duration(milliseconds: 500));
+    }
+  }
+
+  void _removeTodo(int index) {
+    final removedTodo = _todos.removeAt(index);
+    if (_todos.isEmpty) {
+      setState(() {});
+    } else {
+      _listKey.currentState?.removeItem(
+        index,
+        (context, animation) => _buildItem(removedTodo, animation, index, true),
+        duration: const Duration(milliseconds: 400),
+      );
+    }
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('"${removedTodo.title}" silindi!',
+            style: const TextStyle(fontSize: 18)),
+        backgroundColor: Colors.pink.shade400,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        margin: const EdgeInsets.all(20),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Widget _buildItem(Todo todo, Animation<double> animation, int index, bool isRemoving) {
+    return SizeTransition(
+      sizeFactor: animation,
+      child: FadeTransition(
+        opacity: animation,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          margin: const EdgeInsets.only(bottom: 20),
+          decoration: BoxDecoration(
+            color: widget.isDarkMode ? Colors.grey[800] : Colors.white,
+            borderRadius: BorderRadius.circular(25),
+            border: Border.all(
+              color: widget.isDarkMode ? Colors.grey.shade700 : Colors.pink.shade50,
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: todo.isDone
+                    ? Colors.grey.withOpacity(0.05)
+                    : (widget.isDarkMode ? Colors.black26 : Colors.pink.withOpacity(0.08)),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            leading: Transform.scale(
+              scale: 1.8,
+              child: Checkbox(
+                value: todo.isDone,
+                onChanged: isRemoving
+                    ? null
+                    : (val) => setState(() => todo.isDone = val!),
+                activeColor: Colors.pink,
+                shape: const CircleBorder(),
+                side: BorderSide(color: Colors.pink.shade200, width: 2),
+              ),
+            ),
+            title: Text(
+              todo.title,
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w600,
+                color: todo.isDone
+                    ? Colors.grey.shade500
+                    : (widget.isDarkMode ? Colors.white : Colors.black87),
+                decoration: todo.isDone ? TextDecoration.lineThrough : null,
+                decorationColor: Colors.pink.shade300,
+                decorationThickness: 2,
+              ),
+            ),
+            trailing: Container(
+              decoration: BoxDecoration(
+                color: widget.isDarkMode ? Colors.red.shade900.withOpacity(0.3) : Colors.red.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: Icon(Icons.delete_outline,
+                    color: widget.isDarkMode ? Colors.redAccent : Colors.red, size: 32),
+                onPressed: isRemoving ? null : () => _removeTodo(index),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showAddDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        title: const Text('YENİ GÖREV EKLE',
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.pink)),
+        backgroundColor: widget.isDarkMode ? Colors.grey[900] : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: Text(
+          'Yeni Görev Ekle',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              fontSize: 28, fontWeight: FontWeight.bold, color: Colors.pink.shade300),
+        ),
         content: TextField(
           controller: _textController,
           autofocus: true,
-          style: const TextStyle(fontSize: 30),
-          decoration: const InputDecoration(
+          style: TextStyle(fontSize: 24, color: widget.isDarkMode ? Colors.white : Colors.black87),
+          decoration: InputDecoration(
             hintText: 'Ne yapacaksın?',
-            hintStyle: TextStyle(fontSize: 26),
+            hintStyle: TextStyle(fontSize: 22, color: Colors.grey.shade500),
+            filled: true,
+            fillColor: widget.isDarkMode ? Colors.grey[800] : Colors.pink.shade50,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(20),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           ),
         ),
+        actionsAlignment: MainAxisAlignment.center,
         actions: [
-          // EKLE BUTONU
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: ElevatedButton(
-              onPressed: () {
-                if (_textController.text.isNotEmpty) {
-                  setState(() => _todos.add(Todo(id: DateTime.now().toString(), title: _textController.text)));
-                  _textController.clear();
-                  Navigator.pop(context);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.pink,
-                minimumSize: const Size(150, 70), // Buton boyutu
-              ),
-              child: const Text('EKLE', style: TextStyle(fontSize: 26, color: Colors.white)),
+          ElevatedButton(
+            onPressed: () {
+              if (_textController.text.trim().isNotEmpty) {
+                _addTodo(_textController.text);
+                _textController.clear();
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.pink,
+              foregroundColor: Colors.white,
+              elevation: 5,
+              shadowColor: Colors.pink.withOpacity(0.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              minimumSize: const Size(160, 60),
             ),
+            child: const Text('EKLE', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -56,69 +212,184 @@ class _TodoListScreenState extends State<TodoListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF0F5),
-      appBar: AppBar(title: const Text('TODO APP')),
-
-      // BOŞ EKRAN GÖRÜNTÜSÜ
-      body: _todos.isEmpty
-          ? Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.edit_note, size: 200, color: Colors.pink),
-            const Text('LİSTE BOŞ!',
-                style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.pink)),
-          ],
-        ),
-      )
-      // LİSTE GÖRÜNÜMÜ
-          : ListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount: _todos.length,
-        itemBuilder: (context, index) {
-          final todo = _todos[index];
-          return Card(
-            elevation: 5,
-            margin: const EdgeInsets.only(bottom: 20),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            child: ListTile(
-              contentPadding: const EdgeInsets.all(15),
-              // DEV CHECKBOX
-              leading: Transform.scale(
-                scale: 2.5,
-                child: Checkbox(
-                  value: todo.isDone,
-                  onChanged: (val) => setState(() => todo.isDone = val!),
-                  activeColor: Colors.pink,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        titleSpacing: 0,
+        toolbarHeight: 90,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Padding(
+          padding: const EdgeInsets.only(left: 5, right: 15),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.battery_charging_full, size: 30),
+                onPressed: _getBatteryLevel,
+                tooltip: 'Batarya Oku (MethodChannel)',
+              ),
+              const Expanded(
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text('Yapılacaklar',
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 28, letterSpacing: 1.0)),
+                  ),
                 ),
               ),
-              title: Text(todo.title,
-                  style: TextStyle(
-                    fontSize: 30, // Liste elemanı yazısı dev yapıldı
-                    fontWeight: FontWeight.bold,
-                    decoration: todo.isDone ? TextDecoration.lineThrough : null,
-                  )),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete, color: Colors.red, size: 45),
-                onPressed: () => setState(() => _todos.removeAt(index)),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(widget.isDarkMode ? Icons.dark_mode : Icons.light_mode, size: 24),
+                  const SizedBox(width: 5),
+                  // 1. Özellik: Adaptive Switch
+                  Switch.adaptive(
+                    value: widget.isDarkMode,
+                    onChanged: widget.onThemeChanged,
+                    activeColor: Colors.white,
+                    activeTrackColor: Colors.pink.shade200,
+                  ),
+                ],
               ),
+            ],
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: widget.isDarkMode 
+                  ? [Colors.pink.shade900, Colors.pink.shade800]
+                  : [Colors.pink.shade400, Colors.pink.shade300],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          );
-        },
-      ),
-
-      // + BUTONU
-      floatingActionButton: SizedBox(
-        width: 100, // Genişlik artırıldı
-        height: 100, // Yükseklik artırıldı
-        child: FloatingActionButton(
-          onPressed: _showAddDialog,
-          backgroundColor: Colors.pink,
-          elevation: 10,
-          shape: const CircleBorder(),
-          child: const Icon(Icons.add, size: 60, color: Colors.white),
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(35),
+              bottomRight: Radius.circular(35),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.pink.withOpacity(0.4),
+                blurRadius: 15,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
         ),
       ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: widget.isDarkMode 
+                ? [const Color(0xFF121212), const Color(0xFF1E1E1E)]
+                : [const Color(0xFFFFF0F5), Colors.white],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Column(
+          children: [
+            // Batarya Seviyesi Göstergesi
+            if (_batteryLevel != 'Batarya: ?')
+              Padding(
+                padding: const EdgeInsets.only(top: 15),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.green, width: 2),
+                  ),
+                  child: Text(
+                    _batteryLevel,
+                    style: const TextStyle(
+                      fontSize: 18, 
+                      fontWeight: FontWeight.bold, 
+                      color: Colors.green
+                    ),
+                  ),
+                ),
+              ),
+            Expanded(
+              child: _todos.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(40),
+                            decoration: BoxDecoration(
+                              color: widget.isDarkMode ? Colors.grey[800] : Colors.pink.shade50,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.pink.withOpacity(0.1),
+                                  blurRadius: 20,
+                                  spreadRadius: 10,
+                                ),
+                              ],
+                            ),
+                            child: Icon(Icons.fact_check_outlined,
+                                size: 120, color: Colors.pink.shade300),
+                          ),
+                          const SizedBox(height: 30),
+                          const Text(
+                            'Harika! Tüm görevleri tamamladın 🎉',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.pink),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Flutter Architecture & Cross-Platform Demo',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 16,
+                                color: widget.isDarkMode ? Colors.grey.shade400 : Colors.grey,
+                                fontStyle: FontStyle.italic),
+                          ),
+                        ],
+                      ),
+                    )
+                  // 3. Özellik: AnimatedList
+                  : AnimatedList(
+                      key: _listKey,
+                      padding: const EdgeInsets.only(
+                          left: 20, right: 20, top: 30, bottom: 120),
+                      initialItemCount: _todos.length,
+                      itemBuilder: (context, index, animation) {
+                        return _buildItem(_todos[index], animation, index, false);
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.pink.withOpacity(0.4),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: SizedBox(
+          width: 90,
+          height: 90,
+          child: FloatingActionButton(
+            onPressed: _showAddDialog,
+            backgroundColor: Colors.pink,
+            elevation: 0,
+            shape: const CircleBorder(),
+            child: const Icon(Icons.add_rounded, size: 50, color: Colors.white),
+          ),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }
