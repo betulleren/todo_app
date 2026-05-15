@@ -391,7 +391,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
                       ),
                     ),
                   ),
-                  // 3. Özellik: AnimatedList
+                  // AnimatedList
                   IgnorePointer(
                     ignoring: _todos.isEmpty,
                     child: AnimatedList(
@@ -426,7 +426,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
           width: 90,
           height: 90,
           child: FloatingActionButton(
-            // Hot Reload demosu (Rengi değiştir)
+            // Hot Reload demosu
             onPressed: _showAddDialog,
             backgroundColor: Colors.pink,
             elevation: 0,
